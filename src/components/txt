@@ -1,0 +1,122 @@
+import React, { useState, useEffect } from 'react';
+import { db } from '../firebase/firebase'; // Your Firebase config file
+import { collection, addDoc, getDocs } from 'firebase/firestore';
+
+function AdminPOIManager() {
+  const [pois, setPois] = useState([]);
+  const [newPOI, setNewPOI] = useState({ name: '', lat: '', lng: '' });
+
+  // Fetch POIs from Firebase and localStorage
+  useEffect(() => {
+    const fetchPOIs = async () => {
+      const storedPOIs = JSON.parse(localStorage.getItem('pois'));
+
+      if (storedPOIs) {
+        // If localStorage has data, load it
+        setPois(storedPOIs);
+      } else {
+        // Otherwise, fetch from Firebase
+        try {
+          const querySnapshot = await getDocs(collection(db, 'pois'));
+          const firebasePOIs = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          
+          // Set POIs in local state and save to localStorage
+          setPois(firebasePOIs);
+          localStorage.setItem('pois', JSON.stringify(firebasePOIs));
+        } catch (error) {
+          console.error("Error fetching POIs from Firebase:", error);
+        }
+      }
+    };
+
+    fetchPOIs();
+  }, []);
+
+  // Save POIs to localStorage whenever the POIs state changes
+  useEffect(() => {
+    localStorage.setItem('pois', JSON.stringify(pois));
+  }, [pois]);
+
+  // Function to handle adding a new POI
+  const handleAddPOI = async (e) => {
+    e.preventDefault();
+    const newLat = parseFloat(newPOI.lat);
+    const newLng = parseFloat(newPOI.lng);
+
+    // Create a new POI object
+    const newPointOfInterest = {
+      name: newPOI.name,
+      lat: newLat,
+      lng: newLng,
+    };
+
+    try {
+      // Add the new POI to Firebase
+      const docRef = await addDoc(collection(db, 'pois'), newPointOfInterest);
+      
+      // Add the new POI to the list of POIs
+      setPois([...pois, { id: docRef.id, ...newPointOfInterest }]);
+
+      // Reset the form
+      setNewPOI({ name: '', lat: '', lng: '' });
+    } catch (error) {
+      console.error("Error adding POI to Firebase:", error);
+    }
+  };
+
+  return (
+    <div className="p-6 bg-white rounded shadow-md">
+      <h2 className="mb-4 text-xl font-bold">Admin - Manage POIs</h2>
+
+      {/* Add POI Form */}
+      <h3 className="mt-6 text-lg font-bold">Add a New POI</h3>
+      <form onSubmit={handleAddPOI} className="mb-4">
+        <input
+          type="text"
+          placeholder="POI Name"
+          value={newPOI.name}
+          onChange={(e) => setNewPOI({ ...newPOI, name: e.target.value })}
+          className="w-full p-2 mb-4 border rounded"
+          required
+        />
+        <input
+          type="number"
+          placeholder="POI Latitude"
+          value={newPOI.lat}
+          onChange={(e) => setNewPOI({ ...newPOI, lat: e.target.value })}
+          className="w-full p-2 mb-4 border rounded"
+          required
+        />
+        <input
+          type="number"
+          placeholder="POI Longitude"
+          value={newPOI.lng}
+          onChange={(e) => setNewPOI({ ...newPOI, lng: e.target.value })}
+          className="w-full p-2 mb-4 border rounded"
+          required
+        />
+        <button
+          type="submit"
+          className="w-full p-2 text-white bg-blue-500 rounded hover:bg-blue-600"
+        >
+          Add POI
+        </button>
+      </form>
+
+      {/* Display POIs */}
+      <h3 className="mt-6 text-lg font-bold">List of POIs</h3>
+      <ul>
+        {pois.map((poi) => (
+          <li key={poi.id} className="mb-2">
+            <strong>{poi.name}</strong>: {poi.lat}, {poi.lng}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default AdminPOIManager;
